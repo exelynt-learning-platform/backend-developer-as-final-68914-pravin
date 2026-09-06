@@ -4,21 +4,21 @@ A RESTful API for managing resource reservations with JWT-based authentication a
 
 ## Tech Stack
 
-- Java 17
-- Spring Boot 3.2
-- Spring Security + JWT (jjwt 0.12.3)
-- PostgreSQL
-- JPA / Hibernate
-- Swagger / OpenAPI (springdoc 2.3)
-- Maven
+* Java 17
+* Spring Boot 3.2
+* Spring Security + JWT (jjwt 0.12.3)
+* MySQL
+* JPA / Hibernate
+* Swagger / OpenAPI (springdoc 2.3)
+* Maven
 
 ## Getting Started
 
 ### Prerequisites
 
-- **JDK 17** (required — see note below)
-- Maven 3.8+
-- PostgreSQL 13+ **or** Docker
+* **JDK 17** (required — see note below)
+* Maven 3.8+
+* MySQL 8.0+ **or** Docker
 
 > ⚠️ **Use JDK 17.** This project uses Lombok, which does not run on newer JDKs (e.g. JDK 24/25) and fails with
 > `java.lang.ExceptionInInitializerError` / `com.sun.tools.javac.code.TypeTag :: UNKNOWN`.
@@ -30,19 +30,18 @@ A RESTful API for managing resource reservations with JWT-based authentication a
 **Option A — Docker (recommended, no install needed):**
 
 ```bash
-docker run -d --name booking-postgres \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=booking_db \
-  -p 5432:5432 \
-  -v booking_pgdata:/var/lib/postgresql/data \
-  postgres:16-alpine
+docker run -d --name booking-mysql \
+  -e MYSQL_ROOT_PASSWORD=root \
+  -e MYSQL_DATABASE=booking_db \
+  -p 3306:3306 \
+  -v booking_mysql_data:/var/lib/mysql \
+  mysql:8.0
 ```
 
 This matches the app's default connection settings out of the box. Stop/start later with
-`docker stop booking-postgres` / `docker start booking-postgres`.
+`docker stop booking-mysql` / `docker start booking-mysql`.
 
-**Option B — Existing PostgreSQL install:**
+**Option B — Existing MySQL install:**
 
 ```sql
 CREATE DATABASE booking_db;
@@ -52,14 +51,14 @@ The schema is created automatically on first run (`ddl-auto: update`) — no man
 
 ### Environment Variables
 
-| Variable        | Default                         | Description               |
-|-----------------|---------------------------------|---------------------------|
-| `DB_URL`        | `jdbc:postgresql://localhost:5432/booking_db` | JDBC connection URL |
-| `DB_USERNAME`   | `postgres`                      | Database username         |
-| `DB_PASSWORD`   | `postgres`                      | Database password         |
-| `JWT_SECRET`    | *(see application.yml)*         | Base64-encoded JWT secret |
-| `JWT_EXPIRATION`| `86400000`                      | Token expiry in ms (24h)  |
-| `PORT`          | `8080`                          | Server port               |
+| Variable         | Default                                  | Description               |
+| ---------------- | ---------------------------------------- | ------------------------- |
+| `DB_URL`         | `jdbc:mysql://localhost:3306/booking_db` | JDBC connection URL       |
+| `DB_USERNAME`    | `root`                                   | Database username         |
+| `DB_PASSWORD`    | `root`                                   | Database password         |
+| `JWT_SECRET`     | *(see application.yml)*                  | Base64-encoded JWT secret |
+| `JWT_EXPIRATION` | `86400000`                               | Token expiry in ms (24h)  |
+| `PORT`           | `8080`                                   | Server port               |
 
 > **Note:** For production, always set `JWT_SECRET` to a strong, randomly generated base64 value (minimum 256 bits).
 
@@ -76,7 +75,7 @@ mvn clean package -DskipTests
 java -jar target/resource-booking-1.0.0.jar
 
 # Or with custom env
-DB_URL=jdbc:postgresql://localhost:5432/mydb \
+DB_URL=jdbc:mysql://localhost:3306/mydb \
 DB_USERNAME=myuser \
 DB_PASSWORD=mypassword \
 JWT_SECRET=myBase64Secret \
@@ -95,7 +94,7 @@ mvn spring-boot:run
 mvn test
 ```
 
-Tests use an in-memory H2 database and do not require a running PostgreSQL instance.
+Tests use an in-memory H2 database and do not require a running MySQL instance.
 
 ## API Documentation
 
@@ -115,8 +114,8 @@ http://localhost:8080/v3/api-docs
 
 The application seeds the following users on first startup:
 
-| Username | Password  | Role  |
-|----------|-----------|-------|
+| Username | Password   | Role  |
+| -------- | ---------- | ----- |
 | `admin`  | `admin123` | ADMIN |
 | `john`   | `user123`  | USER  |
 | `jane`   | `user123`  | USER  |
@@ -125,11 +124,12 @@ The application seeds the following users on first startup:
 
 ### Authentication
 
-| Method | Endpoint         | Auth | Description     |
-|--------|-----------------|------|-----------------|
+| Method | Endpoint          | Auth | Description       |
+| ------ | ----------------- | ---- | ----------------- |
 | POST   | `/api/auth/login` | None | Login and get JWT |
 
 **Login request:**
+
 ```json
 {
   "username": "admin",
@@ -138,6 +138,7 @@ The application seeds the following users on first startup:
 ```
 
 **Login response:**
+
 ```json
 {
   "token": "eyJhbGci...",
@@ -149,35 +150,35 @@ The application seeds the following users on first startup:
 
 ### Resources
 
-| Method | Endpoint              | Auth        | Role        |
-|--------|----------------------|-------------|-------------|
-| GET    | `/api/resources`      | JWT         | ADMIN, USER |
-| GET    | `/api/resources/{id}` | JWT         | ADMIN, USER |
-| POST   | `/api/resources`      | JWT         | ADMIN only  |
-| PUT    | `/api/resources/{id}` | JWT         | ADMIN only  |
-| DELETE | `/api/resources/{id}` | JWT         | ADMIN only  |
+| Method | Endpoint              | Auth | Role        |
+| ------ | --------------------- | ---- | ----------- |
+| GET    | `/api/resources`      | JWT  | ADMIN, USER |
+| GET    | `/api/resources/{id}` | JWT  | ADMIN, USER |
+| POST   | `/api/resources`      | JWT  | ADMIN only  |
+| PUT    | `/api/resources/{id}` | JWT  | ADMIN only  |
+| DELETE | `/api/resources/{id}` | JWT  | ADMIN only  |
 
 ### Reservations
 
-| Method | Endpoint                  | Auth | Role                              |
-|--------|--------------------------|------|-----------------------------------|
-| GET    | `/api/reservations`       | JWT  | ADMIN (all), USER (own only)      |
-| GET    | `/api/reservations/{id}`  | JWT  | ADMIN (any), USER (own only)      |
-| POST   | `/api/reservations`       | JWT  | ADMIN, USER                       |
-| PUT    | `/api/reservations/{id}`  | JWT  | ADMIN (any), USER (own only)      |
-| DELETE | `/api/reservations/{id}`  | JWT  | ADMIN only                        |
+| Method | Endpoint                 | Auth | Role                         |
+| ------ | ------------------------ | ---- | ---------------------------- |
+| GET    | `/api/reservations`      | JWT  | ADMIN (all), USER (own only) |
+| GET    | `/api/reservations/{id}` | JWT  | ADMIN (any), USER (own only) |
+| POST   | `/api/reservations`      | JWT  | ADMIN, USER                  |
+| PUT    | `/api/reservations/{id}` | JWT  | ADMIN (any), USER (own only) |
+| DELETE | `/api/reservations/{id}` | JWT  | ADMIN only                   |
 
 #### Reservation Query Parameters
 
-| Parameter  | Type             | Description                          |
-|------------|-----------------|--------------------------------------|
-| `status`   | `PENDING \| CONFIRMED \| CANCELLED` | Filter by status |
-| `minPrice` | Decimal          | Minimum price filter                 |
-| `maxPrice` | Decimal          | Maximum price filter                 |
-| `page`     | Integer (0-based)| Page number (default: 0)             |
-| `size`     | Integer          | Page size (default: 10)              |
-| `sortBy`   | String           | Field to sort by (default: createdAt)|
-| `sortDir`  | `asc \| desc`   | Sort direction (default: desc)       |
+| Parameter  | Type                                | Description                           |
+| ---------- | ----------------------------------- | ------------------------------------- |
+| `status`   | `PENDING \| CONFIRMED \| CANCELLED` | Filter by status                      |
+| `minPrice` | Decimal                             | Minimum price filter                  |
+| `maxPrice` | Decimal                             | Maximum price filter                  |
+| `page`     | Integer (0-based)                   | Page number (default: 0)              |
+| `size`     | Integer                             | Page size (default: 10)               |
+| `sortBy`   | String                              | Field to sort by (default: createdAt) |
+| `sortDir`  | `asc \| desc`                       | Sort direction (default: desc)        |
 
 #### Create Reservation
 
@@ -195,8 +196,8 @@ USER identity is taken from the JWT token — the `userId` field is not accepted
 
 ## Authorization Rules
 
-- **ADMIN**: Full CRUD on resources and reservations. Can view all reservations.
-- **USER**: Read-only access to resources. Can create reservations (identity from JWT). Can view and update only their own reservations. Cannot delete reservations.
+* **ADMIN**: Full CRUD on resources and reservations. Can view all reservations.
+* **USER**: Read-only access to resources. Can create reservations (identity from JWT). Can view and update only their own reservations. Cannot delete reservations.
 
 ## Error Responses
 
@@ -213,13 +214,13 @@ All error responses follow this structure:
 }
 ```
 
-| HTTP Status | Scenario                                  |
-|-------------|-------------------------------------------|
-| 400         | Validation errors, invalid input          |
-| 401         | Missing/invalid/expired JWT token         |
-| 403         | Insufficient permissions                  |
-| 404         | Resource or reservation not found         |
-| 500         | Unexpected server error                   |
+| HTTP Status | Scenario                          |
+| ----------- | --------------------------------- |
+| 400         | Validation errors, invalid input  |
+| 401         | Missing/invalid/expired JWT token |
+| 403         | Insufficient permissions          |
+| 404         | Resource or reservation not found |
+| 500         | Unexpected server error           |
 
 ## Project Structure
 
