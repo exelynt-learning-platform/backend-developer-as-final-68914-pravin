@@ -45,9 +45,15 @@ public class ReservationController {
             @Parameter(description = "Sort direction (asc or desc)") @RequestParam(defaultValue = "desc") String sortDir,
             @AuthenticationPrincipal User currentUser) {
 
-        Sort sort = sortDir.equalsIgnoreCase("asc")
-                ? Sort.by(sortBy).ascending()
-                : Sort.by(sortBy).descending();
+        Sort sort;
+
+        if (sortDir.equalsIgnoreCase("asc")) {
+            sort = Sort.by(sortBy).ascending();
+        } else if (sortDir.equalsIgnoreCase("desc")) {
+            sort = Sort.by(sortBy).descending();
+        } else {
+            throw new IllegalArgumentException("sortDir must be either 'asc' or 'desc'");
+        }
 
         Pageable pageable = PageRequest.of(page, size, sort);
 
