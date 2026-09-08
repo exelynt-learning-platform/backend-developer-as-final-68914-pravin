@@ -1,4 +1,4 @@
- package com.booking.controller;
+package com.booking.controller;
 
 import com.booking.dto.request.ReservationRequest;
 import com.booking.dto.request.UpdateReservationRequest;
@@ -22,7 +22,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 import java.util.Set;
@@ -33,6 +41,11 @@ import java.util.Set;
 @Tag(name = "Reservations", description = "Endpoints for managing reservations")
 @SecurityRequirement(name = "bearerAuth")
 public class ReservationController {
+
+    private static final String DEFAULT_PAGE = "0";
+    private static final String DEFAULT_SIZE = "10";
+    private static final String DEFAULT_SORT_BY = "createdAt";
+    private static final String DEFAULT_SORT_DIRECTION = "DESC";
 
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
             "id",
@@ -48,25 +61,18 @@ public class ReservationController {
     public ResponseEntity<Page<ReservationResponse>> getAll(
             @Parameter(description = "Filter by status")
             @RequestParam(required = false) ReservationStatus status,
-
             @Parameter(description = "Minimum price filter")
             @RequestParam(required = false) BigDecimal minPrice,
-
             @Parameter(description = "Maximum price filter")
             @RequestParam(required = false) BigDecimal maxPrice,
-
             @Parameter(description = "Page number (0-based)")
-            @RequestParam(defaultValue = "0") int page,
-
+            @RequestParam(defaultValue = DEFAULT_PAGE) int page,
             @Parameter(description = "Page size")
-            @RequestParam(defaultValue = "10") int size,
-
+            @RequestParam(defaultValue = DEFAULT_SIZE) int size,
             @Parameter(description = "Sort field (e.g. id, price, startTime, createdAt)")
-            @RequestParam(defaultValue = "createdAt") String sortBy,
-
+            @RequestParam(defaultValue = DEFAULT_SORT_BY) String sortBy,
             @Parameter(description = "Sort direction (ASC or DESC)")
-            @RequestParam(defaultValue = "DESC") Direction sortDir,
-
+            @RequestParam(defaultValue = DEFAULT_SORT_DIRECTION) Direction sortDir,
             @AuthenticationPrincipal User currentUser) {
 
         Pageable pageable = createPageable(page, size, sortBy, sortDir);
