@@ -5,6 +5,7 @@ import com.booking.dto.request.UpdateReservationRequest;
 import com.booking.dto.response.ReservationResponse;
 import com.booking.entity.User;
 import com.booking.entity.enums.ReservationStatus;
+import com.booking.exception.BadRequestException;
 import com.booking.service.ReservationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -23,6 +24,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/reservations")
@@ -30,6 +32,13 @@ import java.math.BigDecimal;
 @Tag(name = "Reservations", description = "Endpoints for managing reservations")
 @SecurityRequirement(name = "bearerAuth")
 public class ReservationController {
+
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
+            "id",
+            "price",
+            "startTime",
+            "createdAt"
+    );
 
     private final ReservationService reservationService;
 
@@ -51,7 +60,7 @@ public class ReservationController {
             @Parameter(description = "Page size")
             @RequestParam(defaultValue = "10") int size,
 
-            @Parameter(description = "Sort field (e.g. price, startTime, createdAt)")
+            @Parameter(description = "Sort field (e.g. id, price, startTime, createdAt)")
             @RequestParam(defaultValue = "createdAt") String sortBy,
 
             @Parameter(description = "Sort direction (asc or desc)")
@@ -131,6 +140,13 @@ public class ReservationController {
             String sortBy,
             String sortDir) {
 
+        if (!ALLOWED_SORT_FIELDS.contains(sortBy)) {
+            throw new BadRequestException(
+                    "Invalid sortBy field. Allowed values are: "
+                            + String.join(", ", ALLOWED_SORT_FIELDS)
+            );
+        }
+
         Sort sort;
 
         if (sortDir.equalsIgnoreCase("asc")) {
@@ -138,7 +154,7 @@ public class ReservationController {
         } else if (sortDir.equalsIgnoreCase("desc")) {
             sort = Sort.by(sortBy).descending();
         } else {
-            throw new IllegalArgumentException(
+            throw new BadRequestException(
                     "sortDir must be either 'asc' or 'desc'"
             );
         }
