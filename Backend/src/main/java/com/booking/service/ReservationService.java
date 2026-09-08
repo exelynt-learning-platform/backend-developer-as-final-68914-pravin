@@ -27,43 +27,54 @@ import java.math.BigDecimal;
 @RequiredArgsConstructor
 public class ReservationService {
 
+    private static final String RESERVATION_NOT_FOUND = "Reservation";
+    private static final String RESOURCE_NOT_FOUND = "Resource";
+
     private final ReservationRepository reservationRepository;
     private final ResourceRepository resourceRepository;
 
-    public Page<ReservationResponse> findAll(ReservationStatus status,
-                                              BigDecimal minPrice,
-                                              BigDecimal maxPrice,
-                                              Pageable pageable,
-                                              User currentUser) {
-        Long userId = currentUser.getRole() == Role.ADMIN ? null : currentUser.getId();
+    public Page<ReservationResponse> findAll(
+            ReservationStatus status,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
+            Pageable pageable,
+            User currentUser) {
 
-        Specification<Reservation> spec = ReservationSpecification.buildFilter(userId, status, minPrice, maxPrice);
-        return reservationRepository.findAll(spec, pageable).map(ReservationResponse::from);
+        Long userId = currentUser.getRole() == Role.ADMIN
+                ? null
+                : currentUser.getId();
+
+        Specification<Reservation> specification =
+                ReservationSpecification.buildFilter(
+                        userId,
+                        status,
+                        minPrice,
+                        maxPrice
+                );
+
+        return reservationRepository
+                .findAll(specification, pageable)
+                .map(ReservationResponse::from);
     }
 
     public ReservationResponse findById(Long id, User currentUser) {
-        Reservation reservation = reservationRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Reservation", id));
+        Reservation reservation = getReservationById(id);
 
-        if (currentUser.getRole() != Role.ADMIN && !reservation.getUser().getId().equals(currentUser.getId())) {
-            throw new ForbiddenException("You do not have access to this reservation");
-        }
+        validateAccess(reservation, currentUser);
 
         return ReservationResponse.from(reservation);
     }
 
     @Transactional
-    public ReservationResponse create(ReservationRequest request, User currentUser) {
-        if (!request.endTime().isAfter(request.startTime())) {
-            throw new BadRequestException("End time must be after start time");
-        }
+    public ReservationResponse create(
+            ReservationRequest request,
+            User currentUser) {
 
-        Resource resource = resourceRepository.findById(request.resourceId())
-                .orElseThrow(() -> new ResourceNotFoundException("Resource", request.resourceId()));
+        validateCreateRequest(request);
 
-        if (!resource.getAvailable()) {
-            throw new BadRequestException("Resource is not available for booking");
-        }
+        Resource resource = getResourceById(request.resourceId());
+
+        validateResourceAvailability(resource);
 
         Reservation reservation = Reservation.builder()
                 .user(currentUser)
@@ -75,43 +86,142 @@ public class ReservationService {
                 .status(ReservationStatus.PENDING)
                 .build();
 
-        return ReservationResponse.from(reservationRepository.save(reservation));
+        return ReservationResponse.from(
+                reservationRepository.save(reservation)
+        );
     }
 
     @Transactional
-    public ReservationResponse update(Long id, UpdateReservationRequest request, User currentUser) {
-        Reservation reservation = reservationRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Reservation", id));
+    public ReservationResponse update(
+            Long id,
+            UpdateReservationRequest request,
+            User currentUser) {
 
-        if (currentUser.getRole() != Role.ADMIN && !reservation.getUser().getId().equals(currentUser.getId())) {
-            throw new ForbiddenException("You do not have access to this reservation");
-        }
+        Reservation reservation = getReservationById(id);
 
-        if (request.startTime() != null && request.endTime() != null
-                && !request.endTime().isAfter(request.startTime())) {
-            throw new BadRequestException("End time must be after start time");
-        }
+        validateAccess(reservation, currentUser);
+        validateUpdateRequest(request);
 
-        if (request.resourceId() != null) {
-            Resource resource = resourceRepository.findById(request.resourceId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Resource", request.resourceId()));
-            reservation.setResource(resource);
-        }
+        updateResource(reservation, request);
+        updateReservationFields(reservation, request);
 
-        if (request.startTime() != null) reservation.setStartTime(request.startTime());
-        if (request.endTime() != null) reservation.setEndTime(request.endTime());
-        if (request.status() != null) reservation.setStatus(request.status());
-        if (request.price() != null) reservation.setPrice(request.price());
-        if (request.notes() != null) reservation.setNotes(request.notes());
-
-        return ReservationResponse.from(reservationRepository.save(reservation));
+        return ReservationResponse.from(
+                reservationRepository.save(reservation)
+        );
     }
 
     @Transactional
     public void delete(Long id) {
         if (!reservationRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Reservation", id);
+            throw new ResourceNotFoundException(
+                    RESERVATION_NOT_FOUND,
+                    id
+            );
         }
+
         reservationRepository.deleteById(id);
+    }
+
+    private Reservation getReservationById(Long id) {
+        return reservationRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                RESERVATION_NOT_FOUND,
+                                id
+                        ));
+    }
+
+    private Resource getResourceById(Long resourceId) {
+        return resourceRepository.findById(resourceId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                RESOURCE_NOT_FOUND,
+                                resourceId
+                        ));
+    }
+
+    private void validateAccess(
+            Reservation reservation,
+            User currentUser) {
+
+        boolean isAdmin = currentUser.getRole() == Role.ADMIN;
+        boolean isOwner = reservation.getUser()
+                .getId()
+                .equals(currentUser.getId());
+
+        if (!isAdmin && !isOwner) {
+            throw new ForbiddenException(
+                    "You do not have access to this reservation"
+            );
+        }
+    }
+
+    private void validateCreateRequest(ReservationRequest request) {
+        if (!request.endTime().isAfter(request.startTime())) {
+            throw new BadRequestException(
+                    "End time must be after start time"
+            );
+        }
+    }
+
+    private void validateUpdateRequest(
+            UpdateReservationRequest request) {
+
+        if (request.startTime() != null
+                && request.endTime() != null
+                && !request.endTime().isAfter(request.startTime())) {
+
+            throw new BadRequestException(
+                    "End time must be after start time"
+            );
+        }
+    }
+
+    private void validateResourceAvailability(Resource resource) {
+        if (!resource.getAvailable()) {
+            throw new BadRequestException(
+                    "Resource is not available for booking"
+            );
+        }
+    }
+
+    private void updateResource(
+            Reservation reservation,
+            UpdateReservationRequest request) {
+
+        if (request.resourceId() == null) {
+            return;
+        }
+
+        Resource resource = getResourceById(request.resourceId());
+
+        validateResourceAvailability(resource);
+
+        reservation.setResource(resource);
+    }
+
+    private void updateReservationFields(
+            Reservation reservation,
+            UpdateReservationRequest request) {
+
+        if (request.startTime() != null) {
+            reservation.setStartTime(request.startTime());
+        }
+
+        if (request.endTime() != null) {
+            reservation.setEndTime(request.endTime());
+        }
+
+        if (request.status() != null) {
+            reservation.setStatus(request.status());
+        }
+
+        if (request.price() != null) {
+            reservation.setPrice(request.price());
+        }
+
+        if (request.notes() != null) {
+            reservation.setNotes(request.notes());
+        }
     }
 }
