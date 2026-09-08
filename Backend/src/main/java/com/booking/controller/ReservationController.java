@@ -1,4 +1,4 @@
-package com.booking.controller;
+ package com.booking.controller;
 
 import com.booking.dto.request.ReservationRequest;
 import com.booking.dto.request.UpdateReservationRequest;
@@ -13,11 +13,11 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.hibernate.query.SortDirection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Sort.Direction;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -64,8 +64,8 @@ public class ReservationController {
             @Parameter(description = "Sort field (e.g. id, price, startTime, createdAt)")
             @RequestParam(defaultValue = "createdAt") String sortBy,
 
-            @Parameter(description = "Sort direction (asc or desc)")
-            @RequestParam(defaultValue = "DESC") org.hibernate.query.SortDirection sortDir,
+            @Parameter(description = "Sort direction (ASC or DESC)")
+            @RequestParam(defaultValue = "DESC") Direction sortDir,
 
             @AuthenticationPrincipal User currentUser) {
 
@@ -126,20 +126,11 @@ public class ReservationController {
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * Creates a pageable object with validated sorting parameters.
-     *
-     * @param page    page number (0-based)
-     * @param size    page size
-     * @param sortBy  field to sort by
-     * @param sortDir sorting direction
-     * @return configured Pageable object
-     */
     private Pageable createPageable(
             int page,
             int size,
             String sortBy,
-            org.hibernate.query.SortDirection sortDir) {
+            Direction sortDir) {
 
         if (!ALLOWED_SORT_FIELDS.contains(sortBy)) {
             throw new BadRequestException(
@@ -148,13 +139,7 @@ public class ReservationController {
             );
         }
 
-        Sort sort;
-
-        if (sortDir == org.hibernate.query.SortDirection.ASCENDING) {
-            sort = Sort.by(sortBy).ascending();
-        } else {
-            sort = Sort.by(sortBy).descending();
-        }
+        Sort sort = Sort.by(sortDir, sortBy);
 
         return PageRequest.of(page, size, sort);
     }
