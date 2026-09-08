@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.query.SortDirection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -64,7 +65,7 @@ public class ReservationController {
             @RequestParam(defaultValue = "createdAt") String sortBy,
 
             @Parameter(description = "Sort direction (asc or desc)")
-            @RequestParam(defaultValue = "desc") String sortDir,
+            @RequestParam(defaultValue = "DESC") org.hibernate.query.SortDirection sortDir,
 
             @AuthenticationPrincipal User currentUser) {
 
@@ -129,16 +130,16 @@ public class ReservationController {
      * Creates a pageable object with validated sorting parameters.
      *
      * @param page    page number (0-based)
-     * @param size    number of records per page
+     * @param size    page size
      * @param sortBy  field to sort by
-     * @param sortDir sorting direction (asc or desc)
+     * @param sortDir sorting direction
      * @return configured Pageable object
      */
     private Pageable createPageable(
             int page,
             int size,
             String sortBy,
-            String sortDir) {
+            org.hibernate.query.SortDirection sortDir) {
 
         if (!ALLOWED_SORT_FIELDS.contains(sortBy)) {
             throw new BadRequestException(
@@ -149,14 +150,10 @@ public class ReservationController {
 
         Sort sort;
 
-        if (sortDir.equalsIgnoreCase("asc")) {
+        if (sortDir == org.hibernate.query.SortDirection.ASCENDING) {
             sort = Sort.by(sortBy).ascending();
-        } else if (sortDir.equalsIgnoreCase("desc")) {
-            sort = Sort.by(sortBy).descending();
         } else {
-            throw new BadRequestException(
-                    "sortDir must be either 'asc' or 'desc'"
-            );
+            sort = Sort.by(sortBy).descending();
         }
 
         return PageRequest.of(page, size, sort);
