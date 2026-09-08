@@ -36,14 +36,100 @@ public class ReservationController {
     @GetMapping
     @Operation(summary = "List reservations with optional filtering, pagination, and sorting")
     public ResponseEntity<Page<ReservationResponse>> getAll(
-            @Parameter(description = "Filter by status") @RequestParam(required = false) ReservationStatus status,
-            @Parameter(description = "Minimum price filter") @RequestParam(required = false) BigDecimal minPrice,
-            @Parameter(description = "Maximum price filter") @RequestParam(required = false) BigDecimal maxPrice,
-            @Parameter(description = "Page number (0-based)") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "Page size") @RequestParam(defaultValue = "10") int size,
-            @Parameter(description = "Sort field (e.g. price, startTime, createdAt)") @RequestParam(defaultValue = "createdAt") String sortBy,
-            @Parameter(description = "Sort direction (asc or desc)") @RequestParam(defaultValue = "desc") String sortDir,
+            @Parameter(description = "Filter by status")
+            @RequestParam(required = false) ReservationStatus status,
+
+            @Parameter(description = "Minimum price filter")
+            @RequestParam(required = false) BigDecimal minPrice,
+
+            @Parameter(description = "Maximum price filter")
+            @RequestParam(required = false) BigDecimal maxPrice,
+
+            @Parameter(description = "Page number (0-based)")
+            @RequestParam(defaultValue = "0") int page,
+
+            @Parameter(description = "Page size")
+            @RequestParam(defaultValue = "10") int size,
+
+            @Parameter(description = "Sort field (e.g. price, startTime, createdAt)")
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+
+            @Parameter(description = "Sort direction (asc or desc)")
+            @RequestParam(defaultValue = "desc") String sortDir,
+
             @AuthenticationPrincipal User currentUser) {
+
+        Pageable pageable = createPageable(page, size, sortBy, sortDir);
+
+        return ResponseEntity.ok(
+                reservationService.findAll(
+                        status,
+                        minPrice,
+                        maxPrice,
+                        pageable,
+                        currentUser
+                )
+        );
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Get a reservation by ID")
+    public ResponseEntity<ReservationResponse> getById(
+            @PathVariable Long id,
+            @AuthenticationPrincipal User currentUser) {
+
+        return ResponseEntity.ok(
+                reservationService.findById(id, currentUser)
+        );
+    }
+
+    @PostMapping
+    @Operation(summary = "Create a new reservation")
+    public ResponseEntity<ReservationResponse> create(
+            @Valid @RequestBody ReservationRequest request,
+            @AuthenticationPrincipal User currentUser) {
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(reservationService.create(request, currentUser));
+    }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "Update a reservation")
+    public ResponseEntity<ReservationResponse> update(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateReservationRequest request,
+            @AuthenticationPrincipal User currentUser) {
+
+        return ResponseEntity.ok(
+                reservationService.update(id, request, currentUser)
+        );
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Delete a reservation (ADMIN only)")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+
+        reservationService.delete(id);
+
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Creates a pageable object with validated sorting parameters.
+     *
+     * @param page    page number (0-based)
+     * @param size    number of records per page
+     * @param sortBy  field to sort by
+     * @param sortDir sorting direction (asc or desc)
+     * @return configured Pageable object
+     */
+    private Pageable createPageable(
+            int page,
+            int size,
+            String sortBy,
+            String sortDir) {
 
         Sort sort;
 
@@ -52,41 +138,11 @@ public class ReservationController {
         } else if (sortDir.equalsIgnoreCase("desc")) {
             sort = Sort.by(sortBy).descending();
         } else {
-            throw new IllegalArgumentException("sortDir must be either 'asc' or 'desc'");
+            throw new IllegalArgumentException(
+                    "sortDir must be either 'asc' or 'desc'"
+            );
         }
 
-        Pageable pageable = PageRequest.of(page, size, sort);
-
-        return ResponseEntity.ok(reservationService.findAll(status, minPrice, maxPrice, pageable, currentUser));
-    }
-
-    @GetMapping("/{id}")
-    @Operation(summary = "Get a reservation by ID")
-    public ResponseEntity<ReservationResponse> getById(@PathVariable Long id,
-                                                        @AuthenticationPrincipal User currentUser) {
-        return ResponseEntity.ok(reservationService.findById(id, currentUser));
-    }
-
-    @PostMapping
-    @Operation(summary = "Create a new reservation")
-    public ResponseEntity<ReservationResponse> create(@Valid @RequestBody ReservationRequest request,
-                                                       @AuthenticationPrincipal User currentUser) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(reservationService.create(request, currentUser));
-    }
-
-    @PutMapping("/{id}")
-    @Operation(summary = "Update a reservation")
-    public ResponseEntity<ReservationResponse> update(@PathVariable Long id,
-                                                       @Valid @RequestBody UpdateReservationRequest request,
-                                                       @AuthenticationPrincipal User currentUser) {
-        return ResponseEntity.ok(reservationService.update(id, request, currentUser));
-    }
-
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Delete a reservation (ADMIN only)")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        reservationService.delete(id);
-        return ResponseEntity.noContent().build();
+        return PageRequest.of(page, size, sort);
     }
 }
