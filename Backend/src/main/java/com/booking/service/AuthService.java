@@ -8,6 +8,7 @@ import com.booking.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -19,15 +20,27 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
 
     public AuthResponse login(LoginRequest request) {
+
         authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.username(), request.password())
+                new UsernamePasswordAuthenticationToken(
+                        request.username(),
+                        request.password()
+                )
         );
 
         User user = userRepository.findByUsername(request.username())
-                .orElseThrow();
+                .orElseThrow(() ->
+                        new UsernameNotFoundException(
+                                "User not found: " + request.username()
+                        )
+                );
 
         String token = jwtTokenProvider.generateToken(user);
 
-        return new AuthResponse(token, user.getUsername(), user.getRole().name());
+        return new AuthResponse(
+                token,
+                user.getUsername(),
+                user.getRole().name()
+        );
     }
 }
