@@ -22,6 +22,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Optional;
+import java.util.function.Consumer;
 
 @Service
 @RequiredArgsConstructor
@@ -101,9 +103,8 @@ public class ReservationService {
 
         validateAccess(reservation, currentUser);
         validateUpdateRequest(request);
-
         updateResource(reservation, request);
-        updateReservationFields(reservation, request);
+        applyPartialUpdates(reservation, request);
 
         return ReservationResponse.from(
                 reservationRepository.save(reservation)
@@ -189,39 +190,49 @@ public class ReservationService {
             Reservation reservation,
             UpdateReservationRequest request) {
 
-        if (request.resourceId() == null) {
-            return;
-        }
-
-        Resource resource = getResourceById(request.resourceId());
-
-        validateResourceAvailability(resource);
-
-        reservation.setResource(resource);
+        Optional.ofNullable(request.resourceId())
+                .map(this::getResourceById)
+                .ifPresent(resource -> {
+                    validateResourceAvailability(resource);
+                    reservation.setResource(resource);
+                });
     }
 
-    private void updateReservationFields(
+    private void applyPartialUpdates(
             Reservation reservation,
             UpdateReservationRequest request) {
 
-        if (request.startTime() != null) {
-            reservation.setStartTime(request.startTime());
-        }
+        applyIfPresent(
+                request.startTime(),
+                reservation::setStartTime
+        );
 
-        if (request.endTime() != null) {
-            reservation.setEndTime(request.endTime());
-        }
+        applyIfPresent(
+                request.endTime(),
+                reservation::setEndTime
+        );
 
-        if (request.status() != null) {
-            reservation.setStatus(request.status());
-        }
+        applyIfPresent(
+                request.status(),
+                reservation::setStatus
+        );
 
-        if (request.price() != null) {
-            reservation.setPrice(request.price());
-        }
+        applyIfPresent(
+                request.price(),
+                reservation::setPrice
+        );
 
-        if (request.notes() != null) {
-            reservation.setNotes(request.notes());
-        }
+        applyIfPresent(
+                request.notes(),
+                reservation::setNotes
+        );
+    }
+
+    private <T> void applyIfPresent(
+            T value,
+            Consumer<T> updater) {
+
+        Optional.ofNullable(value)
+                .ifPresent(updater);
     }
 }
